@@ -1,5 +1,5 @@
 #!/bin/bash
-CD_CMD="cd "\\\"$(pwd)\\\"" && source dnvm.sh"
+CD_CMD="cd "\\\"$(pwd)\\\"" "
 VERSION=$(sw_vers -productVersion)
 if (( $(expr $VERSION '<' 10.7.0) )); then
 	IN_WINDOW="in window 1"

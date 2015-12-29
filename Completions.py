@@ -1,3 +1,4 @@
+import os
 import sublime
 import sublime_plugin
 import threading
@@ -21,8 +22,13 @@ class KKultureCompletion( sublime_plugin.EventListener):
         self.cache = []
         self.thread = RetrievePackageNames(5)
         self.thread.start()
-        while(self.thread.is_alive()):
-            pass
+        self.load_package_names()
+
+    def load_package_names(self):
+        if self.thread.is_alive():
+            sublime.set_timeout(lambda:self.load_package_names(), 1000)
+            return
+            
         response = self.thread.response
         if not response:
             print (self.thread.message)
@@ -118,7 +124,10 @@ class KKultureCompletion( sublime_plugin.EventListener):
 class RetrievePackageNames(threading.Thread):
     def __init__(self,timeout):
         self.timeout = timeout
-        self.response = None
+        self.message = None
+        self.response = False
+        self.content = None
+        self.cache_file = os.path.dirname(__file__) + "/packagenames.cache"
         threading.Thread.__init__(self)
 
     def run(self):
@@ -130,11 +139,43 @@ class RetrievePackageNames(threading.Thread):
                 + "$top=100",
                 headers={"User-Agent": "Sublime"})
             http_file = urllib.request.urlopen(request, timeout=self.timeout)
-            self.response = json.loads(http_file.read().decode('utf-8'))['d']
-            return
+            self.content = http_file.read().decode('utf-8')
+            self.write_cache()
         except (urllib.request.HTTPError) as e:
             self.message = '%s: HTTP error %s contacting API' % (__name__, str(e.code))
         except (urllib.request.URLError) as e:
             self.message = '%s: URL error %s contacting API' % (__name__, str(e.reason))
-        self.response = False
+
+        try:
+            if not self.content:
+                self.read_cache()
+            self.response = json.loads(self.content)['d']
+        except:
+            self.message = '%s: JSON parse error' % (__name__)
+        finally:
+            pass
+
         return
+
+    def write_cache(self):
+        try:
+            fo = open(self.cache_file, "w")
+            try:
+                fo.write(self.content)
+            finally:
+                fo.close()
+        except IOError:
+            pass
+
+    def read_cache(self):
+        self.content = False
+        try:
+            fo = open(self.cache_file, "r")
+            try:
+                self.content = fo.read()
+            finally:
+                fo.close()
+        except IOError:
+            pass
+
+
